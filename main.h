@@ -51,30 +51,54 @@ struct CPU {
         A = X = Y = 0;
 
     }
-    Byte Fetch (u32& Cycles, Memory& memory) {
+    Byte Fetch(u32& Cycles, Memory& memory) {
         Byte Data = memory[PC];
         PC++;
         Cycles--; 
         return Data;
     }
+    Byte ReadByte(u32& Cycles, Byte Address, Memory& memory) {
+        Byte Data = memory[Address];
+        Cycles--; 
+        return Data;
+    }
     //OPCODES
     static constexpr Byte
-        LDA_IMMEDIATE = 0xA9;
+        //Load Accumulator: Loads a byte of memory into the accumulator setting the zero and negative lags as appropriate
+        LDA_IM = 0xA9,
+        LDA_ZP = 0xA5,
+        LDA_ZPX = 0xB5,
+        LDA_AB = 0xAD,
+        LDA_ABX = 0xBD,
+        LDA_ABY = 0xB9,
+        LDA_INX = 0xA1,
+        LDA_INY = 0xB1;
+
+    void LDASetStatus() {
+        if (A == 0) {
+            Z = 1;
+        }
+        if (A & 0b10000000 != 0) {
+            N = 1;
+        }
+    }
     void Execute(u32 Cycles, Memory& memory) {
         while (Cycles > 0) {
             Byte Instruction = Fetch(Cycles, memory);
             switch (Instruction) {
-                case LDA_IMMEDIATE:{
+                case LDA_IM:
+                {
                     Byte Value = Fetch(Cycles, memory);
                     A = Value;
-                    if (A == 0) {
-                        Z = 1; 
-                    }
-                    if (A & 0b10000000 != 0) {
-                        N = 1;
-                    }
-                }
-                break;
+                    //Sets Z and N
+                    LDASetStatus();
+                } break;
+                case LDA_ZP:
+                {
+                    Byte ZeroPageAddress = Fetch(Cycles, memory);
+                    A = ReadByte(Cycles, ZeroPageAddress, memory);
+                    LDASetStatus(); 
+                } break;
                 default: {
                     printf("Instruction is not handled");
                 } break;
@@ -87,8 +111,9 @@ int main() {
     CPU cpu; //instance of cpu
     Memory mem; 
     cpu.Reset(mem);
-    mem[0xFFFC] = CPU::LDA_IMMEDIATE;
+    mem[0xFFFC] = CPU::LDA_ZP;
     mem[0xFFFD] = 0x42;
+    mem[0x0042] = 0x84;
     cpu.Execute(3, mem);
     return 0;
 }
